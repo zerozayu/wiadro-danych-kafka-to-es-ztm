@@ -3,7 +3,7 @@ import json
 import time
 from kafka import KafkaProducer
 
-token = 'use your own API Token'
+token = 'use your own Apikey'
 url = 'https://api.um.warszawa.pl/api/action/busestrams_get/'
 resource_id = 'f2e5503e927d-4ad3-9500-4ab9e55deb59'
 sleep_time = 15
@@ -30,7 +30,7 @@ while True:
 
         print('Sending records...')
         for record in data['result']:
-            #print(record)
+            print(record)
             future = producer.send('ztm-input', value=record, key=record["VehicleNumber"].encode('utf-8'))
             result = future.get(timeout=60)
     except:
