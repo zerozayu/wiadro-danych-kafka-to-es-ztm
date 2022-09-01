@@ -1,80 +1,103 @@
 version: '3.3'
 services:
-    elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:7.7.0
-        restart: unless-stopped
-        environment:
-        - discovery.type=single-node
-        - bootstrap.memory_lock=true
-        - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-        ulimits:
-            memlock:
-                soft: -1
-                hard: -1
-        volumes:
-        - esdata:/usr/share/elasticsearch/data
-        ports:
-        - 9200:9200
-
-    kibana:
-        image: docker.elastic.co/kibana/kibana:7.7.0
-        restart: unless-stopped
-        depends_on:
-            - elasticsearch
-        ports:
-            - 5601:5601
-        volumes:
-            - kibanadata:/usr/share/kibana/data
-
-    zookeeper:
-        image: 'bitnami/zookeeper:3'
-        ports:
-            - '2181:2181'
-        volumes:
-            - 'zookeeper_data:/bitnami'
-        environment:
-            - ALLOW_ANONYMOUS_LOGIN=yes
-            
-    kafka:
-        image: 'bitnami/kafka:2'
-        ports:
-            - '9092:9092'
-            - '29092:29092'
-        volumes:
-            - 'kafka_data:/bitnami'
-        environment:
-            - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-            - ALLOW_PLAINTEXT_LISTENER=yes
-            - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,PLAINTEXT_HOST://:29092
-            - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-            - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-        depends_on:
-            - zookeeper
-
-    ztm_kafka_streams:
-        image: "maciejszymczyk/ztm_stream:1.0"
-        environment:
-          - APPLICATION_ID_CONFIG=awesome_overrided_ztm_stream_app_id
-          - BOOTSTRAP_SERVERS_CONFIG=kafka:9092
-        depends_on:
-          - kafka
-
-    logstash:
-        image: docker.elastic.co/logstash/logstash:7.7.0
-        volumes:
-            - "./pipeline:/usr/share/logstash/pipeline"
-        environment:
-            LS_JAVA_OPTS: "-Xmx256m -Xms256m"
-        depends_on:
-            - elasticsearch
-            - kafka
+  elasticsearch:
+    image: elasticsearch:7.17.5
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - es-net
   
+  kibana:
+    image: kibana:7.17.5
+    container_name: kibana
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    volumes:
+      - kibana_data:/usr/share/kibana/data
+    networks:
+      - es-net
+  
+  zookeeper:
+    image: 'bitnami/zookeeper:3.8'
+    container_name: zookeeper
+    ports:
+      - '2181:2181'
+    volumes:
+      - 'zookeeper_data:/bitnami'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - es-net
+  
+  kafka:
+    image: 'bitnami/kafka:latest'
+    container_name: kafka
+    ports:
+      - '9092:9092'
+      - '29092:29092'
+    volumes:
+      - 'kafka_data:/bitnami'
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,PLAINTEXT_HOST://:29092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+    depends_on:
+      - zookeeper
+    networks:
+      - es-net
+  
+  ztm_kafka_streams:
+    image: "maciejszymczyk/ztm_stream:latest"
+    container_name: ztm_kafka_streams
+    environment:
+      - APPLICATION_ID_CONFIG=awesome_overrided_ztm_stream_app_id
+      - BOOTSTRAP_SERVERS_CONFIG=kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - es-net
+  
+  logstash:
+    image: logstash:7.17.5
+    container_name: logstash
+    volumes:
+      - "./pipeline:/usr/share/logstash/pipeline"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    depends_on:
+      - elasticsearch
+      - kafka
+    networks:
+      - es-net
+
 volumes:
-    esdata:
-        driver: local
-    kibanadata:
-        driver: local
-    zookeeper_data:
-        driver: local
-    kafka_data:
-        driver: local
+  es_data:
+    external: true
+  kibana_data:
+    external: true
+  zookeeper_data:
+    external: true
+  kafka_data:
+    external: true
+    
+networks:
+  es-net:
+    external: true
+
